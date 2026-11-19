@@ -1,0 +1,20 @@
+[Unit]
+Description=n2disk packet recorder
+After=network.target
+# Cap the restart loop: with an invalid licence n2disk exits immediately and
+# unbounded Restart=always produced >1.5M restarts in the field. After 5
+# failures in 10 min the unit goes "failed" (visible) instead of flapping
+# forever. Fix the cause, then `systemctl reset-failed n2disk && systemctl start n2disk`.
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/n2disk /etc/n2disk/n2disk.conf
+Restart=always
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

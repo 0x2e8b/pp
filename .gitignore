@@ -1,0 +1,20 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+dist/
+caddy/data/
+.smoke/
+old/
+
+# local and secret material that must never be committed
+.DS_Store
+.env
+.env.*
+credentials
+*.pcap
+*.pcap.*
+*.zip
+*.tgz
+*.log

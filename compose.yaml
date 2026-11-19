@@ -1,0 +1,153 @@
+services:
+  api:
+    build: .
+    restart: unless-stopped
+    # > SR_WORKER_STOP_GRACE_SECONDS + 15 (supervisord's stopwaitsecs for the worker); the grace is 1 to 60 (a value
+    # outside is used as the nearest bound).
+    stop_grace_period: 90s
+    security_opt: ["no-new-privileges:true"]
+    # Only the variables listed here reach the container (no env_file: .env also holds the Basic-auth hash and
+    # installer keys). Every Settings field (src/sycope_recorder/config.py) is listed, with the code's default,
+    # except SR_MAX_CONCURRENT_EXTRACTIONS (4 here, 1 in code). Fixed on purpose, not settable from .env: the
+    # directories and SR_PROBE_URL (they match the volumes and the caddy service), SR_NPCAPEXTRACT_PATH (the
+    # binary the image installs) and gunicorn's SR_BIND/SR_GUNICORN_* (gunicorn.conf.py).
+    environment:
+      SR_PUBLIC_HOST: ${SR_PUBLIC_HOST:?set SR_PUBLIC_HOST}
+      SR_DOWNLOAD_PREFIX: ${SR_DOWNLOAD_PREFIX:-downloads}
+      # Host[/path] used in returned links when downloads are reached through
+      # another address (Sycope Passthrough). Empty = SR_PUBLIC_HOST.
+      SR_DOWNLOAD_URL_BASE: ${SR_DOWNLOAD_URL_BASE:-}
+      # Queue page edits (delete, persistent, cancel, retry, re-extract, pausing the worker, profile actions)
+      # and the debug-log download: both off by default.
+      SR_QUEUE_EDIT: ${SR_QUEUE_EDIT:-false}
+      SR_DEBUG_BUNDLE: ${SR_DEBUG_BUNDLE:-false}
+      # Password for downloading/uploading the configuration (Configuration page); empty = disabled.
+      SR_CONFIG_PASSWORD: ${SR_CONFIG_PASSWORD:-}
+      # Rebuild the profiles from Sycope on the Profiles page (read-only account recommended).
+      SR_SYCOPE_URL: ${SR_SYCOPE_URL:-}
+      SR_SYCOPE_USER: ${SR_SYCOPE_USER:-}
+      SR_SYCOPE_PASSWORD: ${SR_SYCOPE_PASSWORD:-}
+      SR_SYCOPE_VERIFY_TLS: ${SR_SYCOPE_VERIFY_TLS:-true}
+      SR_ROLLING_CHECK: ${SR_ROLLING_CHECK:-true}
+      SR_TIMELINE_DIR: /storage/pcaps/rolling
+      SR_OUTPUT_DIR: /storage/pcaps/alerts
+      # Parallel npcapextract runs in the worker; alerts are queued either way.
+      # 1 serializes extractions. 4 is a safer start; tune to disk throughput (1 to 16).
+      SR_MAX_CONCURRENT_EXTRACTIONS: ${SR_MAX_CONCURRENT_EXTRACTIONS:-4}
+      # npcapextract -u: root writes into alerts/. Set but empty omits -u (npcapextract then runs as nobody and
+      # cannot write there), so this one keeps an empty value (no colon).
+      SR_NPCAPEXTRACT_USER: ${SR_NPCAPEXTRACT_USER-root}
+      # Worker process: running extractions may finish this long on stop/reload, then are re-queued. Only here:
+      # supervisord's stop wait is derived from it at container start, so it cannot be uploaded.
+      SR_WORKER_STOP_GRACE_SECONDS: ${SR_WORKER_STOP_GRACE_SECONDS:-30}
+      SR_WORKER_HEARTBEAT_SECONDS: ${SR_WORKER_HEARTBEAT_SECONDS:-5}
+      SR_WORKER_STALE_SECONDS: ${SR_WORKER_STALE_SECONDS:-60}
+      # Window is computed in the container's local time and must match the
+      # n2disk host clock. Set TZ in .env if the host is not UTC.
+      TZ: ${TZ:-UTC}
+      SR_EXTRACT_TIMEOUT_SECONDS: ${SR_EXTRACT_TIMEOUT_SECONDS:-300}
+      # PCAPs are evidence: not deleted automatically unless you set an age
+      # or a byte cap. The api refuses extractions below SR_MIN_FREE_BYTES.
+      SR_RETENTION_MAX_AGE_DAYS: ${SR_RETENTION_MAX_AGE_DAYS:-0}
+      SR_RETENTION_MAX_TOTAL_BYTES: ${SR_RETENTION_MAX_TOTAL_BYTES:-0}
+      SR_RETENTION_INTERVAL_SECONDS: ${SR_RETENTION_INTERVAL_SECONDS:-3600}
+      SR_MIN_FREE_BYTES: ${SR_MIN_FREE_BYTES:-5368709120}
+      SR_STATE_DIR: /var/lib/sycope-recorder
+      SR_QUEUE_MAX: ${SR_QUEUE_MAX:-2000}
+      SR_JOB_MAX_ATTEMPTS: ${SR_JOB_MAX_ATTEMPTS:-3}
+      SR_JOB_RETRY_DELAY_SECONDS: ${SR_JOB_RETRY_DELAY_SECONDS:-120}
+      SR_JOB_HISTORY_DAYS: ${SR_JOB_HISTORY_DAYS:-30}
+      SR_READY_MARGIN_SECONDS: ${SR_READY_MARGIN_SECONDS:-30}
+      SR_CHUNK_SECONDS: ${SR_CHUNK_SECONDS:-300}
+      SR_SILENCE_WARN_HOURS: ${SR_SILENCE_WARN_HOURS:-0}
+      SR_WATCHDOG_INTERVAL_SECONDS: ${SR_WATCHDOG_INTERVAL_SECONDS:-60}
+      SR_ROLLING_STALE_SECONDS: ${SR_ROLLING_STALE_SECONDS:-900}
+      SR_PROBE_URL: http://caddy:8081
+      # Per-definition profiles: set SR_PROFILES_FILE=/profiles/profiles.json and put the
+      # file in ./profiles (docs/PROFILES.md). Empty = default window/filter for every alert.
+      SR_PROFILES_FILE: ${SR_PROFILES_FILE:-}
+      # Window and filter of alerts without a profile.
+      SR_DEFAULT_BEFORE: ${SR_DEFAULT_BEFORE:-360}
+      SR_DEFAULT_AFTER: ${SR_DEFAULT_AFTER:-360}
+      SR_DEFAULT_FILTER: ${SR_DEFAULT_FILTER:-full}
+      SR_EXPORTER_LAG_SECONDS: ${SR_EXPORTER_LAG_SECONDS:-300}
+      SR_WINDOW_MARGIN_SECONDS: ${SR_WINDOW_MARGIN_SECONDS:-30}
+      SR_WINDOW_MAX_LAG_SECONDS: ${SR_WINDOW_MAX_LAG_SECONDS:-900}
+      SR_WINDOW_WARN_SECONDS: ${SR_WINDOW_WARN_SECONDS:-30}
+      SR_QUIET_WAIT_SECONDS: ${SR_QUIET_WAIT_SECONDS:-21600}
+      SR_QUIET_POLL_SECONDS: ${SR_QUIET_POLL_SECONDS:-30}
+      # Both processes; gunicorn's own level follows SR_LOG_LEVEL too (gunicorn.conf.py).
+      SR_LOG_LEVEL: ${SR_LOG_LEVEL:-INFO}
+      SR_LOG_FORMAT: ${SR_LOG_FORMAT:-text}
+    volumes:
+      - rolling:/storage/pcaps/rolling:ro
+      - alerts:/storage/pcaps/alerts
+      - state:/var/lib/sycope-recorder
+      - ./profiles:/profiles:ro
+      - run:/run/api
+    # Healthcheck runs inside the container against the unix socket.
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import socket,sys; s=socket.socket(socket.AF_UNIX); s.connect('/run/api/api.sock'); s.sendall(b'GET /healthz HTTP/1.0\\r\\n\\r\\n'); sys.exit(0 if b'200' in s.recv(1024) else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      - api
+    # Fails fast on a mangled BASIC_AUTH_HASH / missing certs (see file).
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    # Host ports: SR_HTTPS_PORT/SR_HTTP_PORT when 443/80 are taken (another web server on the host). With
+    # another HTTPS port the links carry it: set SR_DOWNLOAD_URL_BASE=<host>:<port> (the installer does).
+    ports:
+      - "${SR_HTTPS_PORT:-443}:443"
+      - "${SR_HTTP_PORT:-80}:80"
+    environment:
+      SR_PUBLIC_HOST: ${SR_PUBLIC_HOST:?set SR_PUBLIC_HOST}
+      SR_DOWNLOAD_PREFIX: ${SR_DOWNLOAD_PREFIX:-downloads}
+      SR_SITE_ADDRESS: ${SR_SITE_ADDRESS:-${SR_PUBLIC_HOST}}
+      SR_TLS: ${SR_TLS:-internal}
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:?set BASIC_AUTH_USER}
+      BASIC_AUTH_HASH: ${BASIC_AUTH_HASH:?set BASIC_AUTH_HASH}
+      ALLOWED_IPS: ${ALLOWED_IPS:-0.0.0.0/0 ::/0}
+      ALLOWED_EXTRACT_IPS: ${ALLOWED_EXTRACT_IPS:-0.0.0.0/0 ::/0}
+      # Pages, status links and PCAP downloads by analysts. Defaults to ALLOWED_EXTRACT_IPS (the behaviour
+      # before v0.3b1); set it separately to let analysts in while the webhook stays Sycope-only.
+      ALLOWED_UI_IPS: ${ALLOWED_UI_IPS:-${ALLOWED_EXTRACT_IPS:-0.0.0.0/0 ::/0}}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/entrypoint.sh:/entrypoint.sh:ro
+      # Only used with SR_TLS=/certs/... (own certificate); an empty dir is fine.
+      - ./certs:/certs:ro
+      # api writes and caddy serves the SAME `alerts` volume. To use a host
+      # directory, rebind this named volume (driver_opts below / README_DEPLOY
+      # step 5). Never bind-mount the host path into only one of the two
+      # services: caddy then serves an empty volume and every download is 404.
+      - alerts:/srv/alerts:ro
+      - run:/run/api:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # Future recorder (n2disk). Attaches to the rolling volume; needs capture
+  # privileges (host network / NET_RAW / --privileged). Templates in
+  # docs/reference/. Uncomment and complete when integrating the recorder.
+  # recorder:
+  #   image: <n2disk-image>
+  #   restart: unless-stopped
+  #   network_mode: host
+  #   cap_add: ["NET_RAW", "NET_ADMIN"]
+  #   volumes:
+  #     - rolling:/storage/pcaps/rolling
+
+volumes:
+  rolling:
+  alerts:
+  state:
+  run:
+  caddy_data:
+  caddy_config:

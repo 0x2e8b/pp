@@ -1,0 +1,129 @@
+{
+	admin off
+	# Clients that connect to a bare IP send no SNI; without a default name
+	# Caddy aborts the TLS handshake ("internal error"). Seen on the demo host.
+	default_sni {$SR_PUBLIC_HOST:localhost}
+}
+
+# The API behind auth, with the authoritative body size cap (enforced regardless of a lying or
+# absent Content-Length; must match the app's MAX_BODY_BYTES, 2 MiB exactly = 2*1024*1024 bytes:
+# use MiB, not MB, which is 2,000,000 bytes).
+# Import it only inside a `route` that refuses the addresses outside the allowlist first: in a plain
+# handle Caddy sorts basic_auth before respond, so the password would be checked (a bcrypt verification
+# and a 401) before the allowlist's 403, and the allowlist would not stop anyone guessing it.
+(api_upstream) {
+	request_body {
+		max_size 2MiB
+	}
+	basic_auth {
+		{$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
+	}
+	# Compress the app's answers (a 100-row queue page is about 780 KB, about 76 KB gzipped). Caddy's
+	# default match compresses only text-like types (HTML, CSS, JS, JSON, SVG...): the PCAPs
+	# (application/vnd.tcpdump.pcap) and zips the app serves pass unchanged, and the static
+	# /downloads/ handle below has no encode at all.
+	encode zstd gzip
+	reverse_proxy unix//run/api/api.sock
+}
+
+# Default: site address = SR_PUBLIC_HOST with Caddy's internal CA.
+# Bare-IP / operator-supplied certs: set SR_SITE_ADDRESS=:443 and
+# SR_TLS="/certs/server.crt /certs/server.key" and mount the cert dir at
+# /certs (see README_DEPLOY.md, "Own certificate").
+{$SR_SITE_ADDRESS:localhost} {
+	tls {$SR_TLS:internal}
+
+	# Health probe: no auth, for GET and HEAD on /healthz only. Any other method
+	# on /healthz is NOT exempt: it falls through to the rules below (a POST is
+	# the webhook: ALLOWED_EXTRACT_IPS + basic auth), as do /healthz/deep,
+	# /stats and /status/* (the authenticated catch-all).
+	@healthz {
+		path /healthz
+		method GET HEAD
+	}
+	handle @healthz {
+		reverse_proxy unix//run/api/api.sock
+	}
+
+	# Every handle below wraps its directives in `route`, which runs them in the order written (a plain
+	# handle sorts them, and basic_auth would come before respond): the IP allowlist decides first, so
+	# an address outside it gets 403 without a password check (no 401, no bcrypt work), and only an
+	# address inside it is asked for the login.
+
+	# Static PCAP downloads served directly by Caddy (optional IP allowlist, then auth).
+	handle_path /{$SR_DOWNLOAD_PREFIX:downloads}/* {
+		route {
+			@denied not remote_ip {$ALLOWED_IPS:0.0.0.0/0 ::/0}
+			respond @denied "Forbidden" 403
+
+			basic_auth {
+				{$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
+			}
+			root * /srv/alerts
+			file_server {
+				browse off
+			}
+		}
+	}
+
+	# Who may reach what, in three groups (the order of these handles matters, the first match wins):
+	#  1. the operator's actions on the pages (delete, profiles, configuration): ALLOWED_UI_IPS
+	#  2. any other POST, i.e. the Sycope webhook (any path, legacy contract): ALLOWED_EXTRACT_IPS
+	#  3. everything else, GET: queue, status pages, System/Profiles/Configuration, PCAP: ALLOWED_UI_IPS
+	# ALLOWED_UI_IPS defaults to ALLOWED_EXTRACT_IPS (compose.yaml), the behaviour before v0.3b1, so
+	# nothing opens up on upgrade; set it to let analysts in while the webhook stays Sycope-only.
+	# Keep the path list in sync with the POST routes of api.py (a test checks it).
+	@operator_action {
+		method POST
+		path /delete /persistent /queue/delete /queue/persistent /reload-profiles /profiles-upload /profiles-apply /profiles-revert /profiles-sync /configuration-download /configuration-upload /configuration-apply /configuration-revert /queue-cancel /queue-retry /queue-persistent /queue-reextract /queue-zip /worker-pause
+	}
+	handle @operator_action {
+		route {
+			@denied_ui_action not remote_ip {$ALLOWED_UI_IPS:0.0.0.0/0 ::/0}
+			respond @denied_ui_action "Forbidden" 403
+			import api_upstream
+		}
+	}
+
+	@webhook method POST
+	handle @webhook {
+		route {
+			@denied_webhook not remote_ip {$ALLOWED_EXTRACT_IPS:0.0.0.0/0 ::/0}
+			respond @denied_webhook "Forbidden" 403
+			import api_upstream
+		}
+	}
+
+	handle {
+		route {
+			@denied_ui not remote_ip {$ALLOWED_UI_IPS:0.0.0.0/0 ::/0}
+			respond @denied_ui "Forbidden" 403
+			import api_upstream
+		}
+	}
+
+	# A download that does not exist (yet): ask the api why. The
+	# PCAP is produced after the capture window closes, so a link clicked early
+	# gets "being prepared" (202) and a link with no packets gets an explanation
+	# instead of a bare 404. Only reached after ALLOWED_IPS and basic_auth passed (a refused
+	# client got its 403 or 401 before the file server ran).
+	handle_errors {
+		@missing_download expression {http.error.status_code} == 404 && {http.request.orig_uri.path}.startsWith("/{$SR_DOWNLOAD_PREFIX:downloads}/")
+		handle @missing_download {
+			rewrite * /status/{http.request.orig_uri.path.file}
+			reverse_proxy unix//run/api/api.sock
+		}
+	}
+}
+
+# Internal-only listener (port 8081 is not published in compose): lets the api's
+# self-check prove that this container serves the same alerts storage the api
+# writes to. Serves nothing except the api's own short-lived probe files.
+http://:8081 {
+	@probe path /.probe-*
+	handle @probe {
+		root * /srv/alerts
+		file_server
+	}
+	respond 404
+}

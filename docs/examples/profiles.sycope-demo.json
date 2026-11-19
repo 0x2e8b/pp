@@ -1,0 +1,1287 @@
+{
+  "_help": {
+    "def_id": "Sycope alert definition id. An alert is matched to its profile by this id (definitionId / alertDefId in the webhook). Must be unique.",
+    "rule_id": "Rule id of the definition (template library). Used only when the webhook has no definition id and exactly one profile has this rule id.",
+    "name": "Definition name. Shown on the queue and status pages next to the job; not used for matching.",
+    "time_range_s": "CHANGES THE WINDOW. Seconds the definition looks back (its timeRange). An alert at T is extracted from T - time_range_s - SR_EXPORTER_LAG_SECONDS to T + SR_WINDOW_MARGIN_SECONDS. 1 to 604800.",
+    "packet_dims": "CHANGES THE BPF FILTER. Grouping fields of the definition that exist in packets: {field, alias} with field one of clientIp, serverIp, serverPort, protocol. Each one present in the alert becomes a term: host <clientIp>, host <serverIp>, port <serverPort>, <protocol>. Remove one to make the filter broader; an empty list with no static means NO BPF FILTER.",
+    "static": "CHANGES THE BPF FILTER. Constant pre-filters of the definition: {\"serverPort\": [53]} or {\"protocol\": [17]}. Used when the port or protocol is not in packet_dims: one protocol -> udp/tcp/icmp, several ports -> (port a or port b). Several protocols add no term."
+  },
+  "format": 2,
+  "profiles": [
+    {
+      "def_id": "67137668-d89d1b5f-28fdc7cf",
+      "rule_id": "Discovery_025",
+      "name": "APIPA address assignment",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc7d8",
+      "rule_id": "Exfiltration_065",
+      "name": "Abnormal DNS Query Limit",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc7d5",
+      "rule_id": "Exfiltration_056",
+      "name": "Abnormal DNS Response Limit",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137669-d89d1b5f-28fdc898",
+      "rule_id": "Exfiltration_070",
+      "name": "Abnormal Upload/Download Ratio1",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc7d7",
+      "rule_id": "Discovery_024",
+      "name": "Abnormal flows ratios",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137669-d89d1b5f-28fdc89e",
+      "rule_id": "Command and Control_056",
+      "name": "After-Hours Traffic",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc843",
+      "rule_id": "Impact_023",
+      "name": "Botnet Attack via DNS",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        }
+      ],
+      "static": {
+        "serverPort": [
+          53
+        ]
+      }
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc848",
+      "rule_id": "Credential Access_007",
+      "name": "Brute Force Attack",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "serverPort",
+          "field": "serverPort"
+        }
+      ],
+      "static": {
+        "serverPort": [
+          21,
+          22,
+          23,
+          25,
+          69,
+          80,
+          88,
+          110,
+          119,
+          139,
+          143,
+          161,
+          220,
+          389,
+          443,
+          445,
+          512,
+          513,
+          636,
+          995,
+          1433,
+          1521,
+          2002,
+          3306,
+          3389,
+          3690,
+          4000,
+          4899,
+          5038,
+          5060,
+          5222,
+          5432,
+          5631,
+          5900,
+          5985,
+          5986,
+          6667
+        ]
+      }
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc7d4",
+      "rule_id": "Command and Control_041",
+      "name": "Cleartext Application",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        }
+      ],
+      "static": {
+        "serverPort": [
+          20,
+          21,
+          23,
+          69,
+          80,
+          110,
+          143,
+          389,
+          513,
+          587
+        ]
+      }
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc84c",
+      "rule_id": "Impact_019",
+      "name": "DDoS Attack",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "serverPort",
+          "field": "serverPort"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc850",
+      "rule_id": "Impact_021",
+      "name": "DDoS DNS Amplification Attack",
+      "time_range_s": 300,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "serverPort",
+          "field": "serverPort"
+        }
+      ],
+      "static": {
+        "serverPort": [
+          53
+        ]
+      }
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc851",
+      "rule_id": "Impact_022",
+      "name": "DDoS Protocol Flood",
+      "time_range_s": 3600,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "protocolName",
+          "field": "protocol"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc7e3",
+      "rule_id": "Exfiltration_053",
+      "name": "DNS Transfer Limit",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc856",
+      "rule_id": "Impact_020",
+      "name": "DoS Attack",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "serverPort",
+          "field": "serverPort"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc7df",
+      "rule_id": "Command and Control_040",
+      "name": "Email Worm",
+      "time_range_s": 300,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "serverPort",
+          "field": "serverPort"
+        }
+      ],
+      "static": {
+        "serverPort": [
+          25
+        ]
+      }
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc85a",
+      "rule_id": "Discovery_029",
+      "name": "Excessive ICMP Requests",
+      "time_range_s": 300,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        }
+      ],
+      "static": {
+        "protocol": [
+          1
+        ]
+      }
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc858",
+      "rule_id": "Command and Control_050",
+      "name": "Frequent Short-Lived Connections",
+      "time_range_s": 300,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc7ef",
+      "rule_id": "Exfiltration_061",
+      "name": "High Data Transfer (Int)",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc7f0",
+      "rule_id": "Exfiltration_060",
+      "name": "High Data Transfer (Int<-> Ext)",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc7f4",
+      "rule_id": "Reconnaissance_005",
+      "name": "Horizontal Scan",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc85f",
+      "rule_id": "Command and Control_039",
+      "name": "Ingress from High-Risk Countries",
+      "time_range_s": 600,
+      "packet_dims": [],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc7f8",
+      "rule_id": "Command and Control_043",
+      "name": "IoT/OT Device Discovered",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "serverPort",
+          "field": "serverPort"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137669-d89d1b5f-28fdc8a7",
+      "rule_id": "Exfiltration_071",
+      "name": "Large Data Upload to External",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc7f9",
+      "rule_id": "Exfiltration_059",
+      "name": "Large Google Drive Upload Traffic",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc7e2",
+      "rule_id": "Exfiltration_052",
+      "name": "Large Size ICMP Packets",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {
+        "protocol": [
+          1,
+          58
+        ]
+      }
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc7de",
+      "rule_id": "Exfiltration_054",
+      "name": "Large Size TCP Packets",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {
+        "protocol": [
+          6
+        ]
+      }
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc7fa",
+      "rule_id": "Exfiltration_058",
+      "name": "Large Size UDP Packets",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {
+        "protocol": [
+          17
+        ]
+      }
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc803",
+      "rule_id": "Discovery_026",
+      "name": "Multicast DNS from Internet",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        }
+      ],
+      "static": {
+        "protocol": [
+          17
+        ],
+        "serverPort": [
+          5353
+        ]
+      }
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc800",
+      "rule_id": "Initial Access_007",
+      "name": "P2P Activity",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc7e4",
+      "rule_id": "Impact_016",
+      "name": "Possible DNS Reflection Attack",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc861",
+      "rule_id": "Lateral Movement_010",
+      "name": "Possible Lateral Movement",
+      "time_range_s": 1800,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {
+        "serverPort": [
+          22,
+          135,
+          445,
+          5985,
+          5986,
+          3389
+        ]
+      }
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc807",
+      "rule_id": "Exfiltration_057",
+      "name": "Possible SPAM activity",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc860",
+      "rule_id": "Discovery_030",
+      "name": "Potential Virus Outbreak",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverPort",
+          "field": "serverPort"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc868",
+      "rule_id": "Lateral Movement_009",
+      "name": "Rogue RDP Access",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        }
+      ],
+      "static": {
+        "serverPort": [
+          3389
+        ]
+      }
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc86b",
+      "rule_id": "Exfiltration_068",
+      "name": "SMB Traffic to External Networks",
+      "time_range_s": 180,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        }
+      ],
+      "static": {
+        "serverPort": [
+          445,
+          139
+        ]
+      }
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc80a",
+      "rule_id": "Impact_018",
+      "name": "SYN Flood Attack",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc86e",
+      "rule_id": "Command and Control_053",
+      "name": "Suspicious Domain - Malware via DNS",
+      "time_range_s": 120,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc86f",
+      "rule_id": "Command and Control_051",
+      "name": "Suspicious Domain - Malware via HTTP",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc870",
+      "rule_id": "Lateral Movement_012",
+      "name": "Suspicious Host",
+      "time_range_s": 900,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc80e",
+      "rule_id": "Impact_017",
+      "name": "Suspicious IP - Cryptomining",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc876",
+      "rule_id": "Command and Control_052",
+      "name": "Suspicious IP - Malicious",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc80c",
+      "rule_id": "Command and Control_045",
+      "name": "Suspicious IP - Open DNS",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc813",
+      "rule_id": "Initial Access_008",
+      "name": "Suspicious IP - Phishing",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc814",
+      "rule_id": "Command and Control_047",
+      "name": "Suspicious IP - Proxy",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc819",
+      "rule_id": "Discovery_027",
+      "name": "Suspicious IP - Scanner",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc81b",
+      "rule_id": "Initial Access_009",
+      "name": "Suspicious IP - Spam",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc81f",
+      "rule_id": "Command and Control_044",
+      "name": "Suspicious IP - Sycope Community",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc822",
+      "rule_id": "Command and Control_046",
+      "name": "Suspicious IP - TOR",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "6798e57c-7bc771b9-e5a72734",
+      "rule_id": "Command and Control_038",
+      "name": "Suspicious IP - User Lookup",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc87b",
+      "rule_id": "Command and Control_054",
+      "name": "Suspicious JA3 Fingerprint",
+      "time_range_s": 120,
+      "packet_dims": [
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc824",
+      "rule_id": "Command and Control_048",
+      "name": "Suspicious Port - Allowlist",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc827",
+      "rule_id": "Command and Control_049",
+      "name": "Suspicious Port - Blocklist",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc87a",
+      "rule_id": "Command and Control_055",
+      "name": "Suspicious Protocol Mixing",
+      "time_range_s": 300,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc87f",
+      "rule_id": "Credential Access_009",
+      "name": "Suspicious SSH Protocol Change",
+      "time_range_s": 600,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        }
+      ],
+      "static": {
+        "serverPort": [
+          22
+        ]
+      }
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc883",
+      "rule_id": "Discovery_033",
+      "name": "Unauthorized DHCP Activity",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "serverPort",
+          "field": "serverPort"
+        },
+        {
+          "alias": "protocolName",
+          "field": "protocol"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc880",
+      "rule_id": "Discovery_034",
+      "name": "Unauthorized DNS Activity",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "serverPort",
+          "field": "serverPort"
+        },
+        {
+          "alias": "protocolName",
+          "field": "protocol"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc884",
+      "rule_id": "Discovery_031",
+      "name": "Unauthorized Internet Access",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverPort",
+          "field": "serverPort"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137669-d89d1b5f-28fdc88c",
+      "rule_id": "Discovery_032",
+      "name": "Unauthorized LDAP Activity",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "serverPort",
+          "field": "serverPort"
+        },
+        {
+          "alias": "protocolName",
+          "field": "protocol"
+        }
+      ],
+      "static": {}
+    },
+    {
+      "def_id": "67137669-d89d1b5f-28fdc88f",
+      "rule_id": "Credential Access_008",
+      "name": "Unauthorized LLMNR/NetBIOS Activity",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "protocolName",
+          "field": "protocol"
+        },
+        {
+          "alias": "serverPort",
+          "field": "serverPort"
+        }
+      ],
+      "static": {
+        "protocol": [
+          17
+        ],
+        "serverPort": [
+          137,
+          5335
+        ]
+      }
+    },
+    {
+      "def_id": "67137669-d89d1b5f-28fdc895",
+      "rule_id": "Discovery_035",
+      "name": "Unauthorized NFS Export Data",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "protocolName",
+          "field": "protocol"
+        },
+        {
+          "alias": "serverPort",
+          "field": "serverPort"
+        }
+      ],
+      "static": {
+        "serverPort": [
+          111,
+          249
+        ]
+      }
+    },
+    {
+      "def_id": "67137669-d89d1b5f-28fdc892",
+      "rule_id": "Lateral Movement_011",
+      "name": "Unauthorized RDP from/to the Internet",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "protocolName",
+          "field": "protocol"
+        },
+        {
+          "alias": "serverPort",
+          "field": "serverPort"
+        }
+      ],
+      "static": {
+        "serverPort": [
+          3389
+        ]
+      }
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc82a",
+      "rule_id": "Exfiltration_067",
+      "name": "Unexpected decrease in number of bytes",
+      "time_range_s": 60,
+      "packet_dims": [],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc82e",
+      "rule_id": "Exfiltration_063",
+      "name": "Unexpected increase in BPS",
+      "time_range_s": 60,
+      "packet_dims": [],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc831",
+      "rule_id": "Exfiltration_062",
+      "name": "Unexpected increase in PPS",
+      "time_range_s": 60,
+      "packet_dims": [],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc835",
+      "rule_id": "Exfiltration_064",
+      "name": "Unexpected increase in numbe of packets",
+      "time_range_s": 60,
+      "packet_dims": [],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc834",
+      "rule_id": "Exfiltration_066",
+      "name": "Unexpected increase in number of bytes",
+      "time_range_s": 60,
+      "packet_dims": [],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc837",
+      "rule_id": "Exfiltration_069",
+      "name": "Unexpected increase in number of flows",
+      "time_range_s": 60,
+      "packet_dims": [],
+      "static": {}
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc83d",
+      "rule_id": "Discovery_028",
+      "name": "Unprotected Docker Daemon",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        }
+      ],
+      "static": {
+        "protocol": [
+          6
+        ],
+        "serverPort": [
+          2375,
+          2376
+        ]
+      }
+    },
+    {
+      "def_id": "67137668-d89d1b5f-28fdc83e",
+      "rule_id": "Reconnaissance_006",
+      "name": "Vertical Scan",
+      "time_range_s": 60,
+      "packet_dims": [
+        {
+          "alias": "clientIp",
+          "field": "clientIp"
+        },
+        {
+          "alias": "serverIp",
+          "field": "serverIp"
+        },
+        {
+          "alias": "protocolName",
+          "field": "protocol"
+        }
+      ],
+      "static": {}
+    }
+  ]
+}

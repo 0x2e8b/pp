@@ -1,0 +1,26 @@
+# Real recorder host (n2disk runs on the host and writes SR_ROLLING_DIR):
+#   docker compose --env-file .env -f compose.yaml -f compose.ntop.yaml up -d --build
+# - the api image installs ntop's npcapextract at build time (Dockerfile INSTALL_NTOP)
+# - rolling/alerts are bind-backed named volumes (api and caddy still share the SAME alerts
+#   volume; never bind-mount the host path into only one service, README_DEPLOY step 5)
+# - set TZ in .env to the host's zone: npcapextract finds files by host-local directory names
+services:
+  api:
+    build:
+      context: .
+      args:
+        INSTALL_NTOP: "1"
+
+volumes:
+  rolling:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${SR_ROLLING_DIR:-/storage/pcaps/rolling}
+      o: bind
+  alerts:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${SR_ALERTS_DIR:-/storage/pcaps/alerts}
+      o: bind

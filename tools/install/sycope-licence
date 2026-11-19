@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Console menu for the ntop licences of this host (installed as /usr/local/sbin/sycope-licence by the installer).
+# Everything it installs goes through `install.sh --licence`: backup, verification by n2disk/nProbe, rollback, guard.
+set -uo pipefail
+INSTALL_SH="@INSTALL_SH@"
+INBOX=/var/lib/sycope-recorder-installer/inbox
+REPORT=/var/lib/sycope-recorder-installer/reports/licence-latest.md
+TITLE="Sycope recorder: licences"
+
+[ "$(id -u)" -eq 0 ] || { echo "run as root: sudo $0" >&2; exit 2; }
+command -v whiptail >/dev/null || { echo "whiptail is missing: apt-get install whiptail" >&2; exit 2; }
+[ -x "$INSTALL_SH" ] || { echo "installer not found at $INSTALL_SH: run the installer again" >&2; exit 2; }
+
+show() {  # show a text in a scrollable box
+    local f
+    f=$(mktemp)
+    printf '%s\n' "$1" >"$f"
+    whiptail --title "$TITLE" --scrolltext --textbox "$f" 24 100
+    rm -f "$f"
+}
+
+install_now() {  # run the guarded install on the given files (or the inbox) and show its report
+    "$INSTALL_SH" --licence --yes "$@" >/dev/null 2>&1
+    local rc=$?
+    show "$( [ $rc -eq 0 ] && echo 'Done.' || echo 'Not everything worked: see below.')
+
+$(cat "$REPORT" 2>/dev/null || echo 'no report')"
+}
+
+paste_key() {  # $1 = n2disk | nprobe
+    local key f d
+    key=$(whiptail --title "$TITLE" --inputbox "Paste the $1 licence key (one line, as in the $1.license file):" 10 100 \
+          3>&1 1>&2 2>&3) || return
+    key=$(printf '%s' "$key" | tr -d '\r')
+    [ -n "$key" ] || return
+    d=$(mktemp -d)  # root's private copy, not the inbox: the inbox unit must not race this run
+    f="$d/$1.license"
+    printf '%s\n' "$key" >"$f"
+    install_now "$f"
+    rm -rf "$d"
+}
+
+from_file() {
+    local p
+    p=$(whiptail --title "$TITLE" --inputbox "Path of the licence file (name n2disk*.license or nprobe*.license),
+for example on a mounted USB stick:" 10 100 3>&1 1>&2 2>&3) || return
+    [ -n "$p" ] && install_now "$p"
+}
+
+while true; do
+    choice=$(whiptail --title "$TITLE" --menu "Licences are bound to this host's SystemIDs (n2disk and nProbe have different ones)." 18 90 6 \
+        1 "Show the SystemIDs and the licence request text" \
+        2 "Paste the n2disk licence key" \
+        3 "Paste the nProbe licence key" \
+        4 "Install a licence file (USB stick, scp upload)" \
+        5 "Install what is in the inbox ($INBOX)" \
+        6 "Quit" 3>&1 1>&2 2>&3) || exit 0
+    case "$choice" in
+        1) show "$("$INSTALL_SH" --licence-request 2>&1)
+
+To upload instead of pasting: scp n2disk.license nprobe.license <user>@<this host>:$INBOX/
+(the user must be in the group sycope-licence; the files are installed within seconds,
+the result is in $REPORT)." ;;
+        2) paste_key n2disk ;;
+        3) paste_key nprobe ;;
+        4) from_file ;;
+        5) install_now ;;
+        *) exit 0 ;;
+    esac
+done
