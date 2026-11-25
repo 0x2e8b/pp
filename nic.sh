@@ -2,11 +2,13 @@
 # Capture NIC RX tuning (PF_RING non-ZC, n2disk/nprobe). Interactive: bash nic.sh
 # Finds the NICs, proposes the capture ones, then a menu: check / apply / measure / rss / persist / revert.
 # Non-interactive: NICS="eno1np0 eno2np1" bash nic.sh check|apply|measure|rss|persist|revert|status
+# Env: Q=<queues per NIC> (default: free physical cores / NICs on the node), RESERVE=4 cores for n2disk/nprobe
 # apply/rss/revert reset the link of the chosen NICs for a few seconds.
 set -u
 SYS=${SYS:-/sys/class/net}; PROC=${PROC:-/proc}; CPUON=${CPUON:-/sys/devices/system/cpu/online}
 ST=${ST:-/root/nic}; UNIT=${UNIT:-/etc/systemd/system/nic-tune.service}; SELF=${SELF:-/usr/local/sbin/nic.sh}
-N2CONF=${N2CONF:-/etc/n2disk/n2disk.conf}; QWANT=${Q:-16}; SECS=${SECS:-10}
+N2CONF=${N2CONF:-/etc/n2disk/n2disk.conf}; QSET=${Q:-}; SECS=${SECS:-10}
+CPUDIR=${CPUDIR:-/sys/devices/system/cpu}; RESERVE=${RESERVE:-4}   # physical cores per node kept free for n2disk/nprobe
 mkdir -p $ST
 have() { command -v $1 >/dev/null 2>&1; }
 say()  { echo "$*"; }
@@ -68,18 +70,49 @@ choose() {
   echo "$NICS" > $ST/nics
 }
 
-# ---------- plan: queues and CPUs per NIC (NICs sharing a node share its CPUs) ----------
-declare -A OFF QN USED CNT
+# ---------- plan: queues and CPUs per NIC ----------
+# Physical cores first (one thread per core), hyper-thread siblings only after them.
+# RESERVE physical cores per node stay free for n2disk/nprobe. NICs on one node share the rest.
+# Queues: Q if given, else free physical cores / NICs on the node; never lowered silently.
+declare -A SLOT QN AL CNT FREE RSV RES NP SIBOF
+prep_node() {   # $1 = a NIC; once per node: FREE = physical cores for IRQs, RSV = cores kept for n2disk/nprobe
+  local n c f p=() k; n=$(node $1); [ -n "${NP[$n]:-}" ] && return
+  for c in $(cpus $1); do
+    f=$c; [ -r $CPUDIR/cpu$c/topology/thread_siblings_list ] && IFS=,- read f _ < $CPUDIR/cpu$c/topology/thread_siblings_list
+    if [ "$f" = "$c" ]; then p+=($c); else SIBOF[$f]="${SIBOF[$f]:-} $c"; fi
+  done
+  RES[$n]=$RESERVE; [ ${#p[@]} -lt $(( RESERVE + 2*${CNT[$n]} )) ] && RES[$n]=0
+  k=$(( ${#p[@]} - ${RES[$n]} )); NP[$n]=$k; FREE[$n]="${p[*]:0:$k}"; RSV[$n]="${p[*]:$k}"
+}
+# CPUs of one NIC: its own share of the node's physical cores, then the hyper-threads of those same cores
+cpuset() { local n per c sl; n=$(node $1); sl=${SLOT[$1]:-0}; per=$(( ${NP[$n]} / ${CNT[$n]} )); [ $per -lt 1 ] && per=1
+  set -- ${FREE[$n]}; shift $(( sl * per )) 2>/dev/null; local mine=("${@:1:$per}")
+  for c in ${mine[@]}; do echo $c; done; for c in ${mine[@]}; do echo ${SIBOF[$c]:-} | tr ' ' '\n' | grep .; done; }
+reserved() { echo ${RSV[$(node $1)]} | tr ' ' '\n' | grep .; }
 plan() {
-  local i n per mx q
+  local i n mx q cur per phys dec; declare -A USED
   for i in $NICS; do n=$(node $i); CNT[$n]=$(( ${CNT[$n]:-0} + 1 )); done
   for i in $NICS; do
-    n=$(node $i); per=$(( $(cpus $i | wc -l) / ${CNT[$n]} )); mx=$(chans $i maximums)
-    q=$QWANT; [[ $mx =~ ^[0-9]+$ ]] && [ $mx -lt $q ] && q=$mx; [ $per -lt $q ] && q=$per; [ $q -lt 1 ] && q=1
-    QN[$i]=$q; OFF[$i]=${USED[$n]:-0}; USED[$n]=$(( ${USED[$n]:-0} + q ))
+    n=$(node $i); SLOT[$i]=${USED[$n]:-0}; USED[$n]=$(( ${USED[$n]:-0} + 1 ))
+    prep_node $i; mx=$(chans $i maximums); cur=$(chans $i Current)
+    per=$(cpuset $i | wc -l)
+    phys=$(( ${NP[$n]} / ${CNT[$n]} )); [ $phys -lt 1 ] && phys=1
+    q=${QSET:-$phys}; [[ $mx =~ ^[0-9]+$ ]] && [ $mx -lt $q ] && q=$mx; [ $q -lt 1 ] && q=1
+    if [ -z "$QSET" ] && [[ $cur =~ ^[0-9]+$ ]] && [ $cur -gt $q ]; then
+      dec=$(cat $ST/$i.q 2>/dev/null)
+      if [ -z "$dec" ]; then
+        if [ -t 0 ] && [ "${MODE:-}" != boot ]; then
+          say "$i has $cur queues now; the plan is $q (one per free physical core, ${RES[$n]} cores kept for n2disk/nprobe)."
+          if yes "  Reduce $i from $cur to $q queues?"; then dec=$q; else dec=$cur; fi
+          echo $dec > $ST/$i.q
+        else dec=$cur; warn "$i: keeping $cur queues (more than the plan $q); run Q=$q to reduce"; fi
+      fi
+      q=$dec
+    fi
+    QN[$i]=$q; AL[$i]=$(( q < per ? q : per ))
   done
 }
-pick() { cpus $1 | tail -n +$(( ${OFF[$1]} + 1 )) | head -n ${QN[$1]}; }
+pick() { cpuset $1 | head -n ${AL[$1]}; }
 
 save() {
   for i in $NICS; do
@@ -91,7 +124,7 @@ save() {
 }
 
 show() {
-  local i n l q x f
+  local i n l q x f c
   for i in $NICS; do
     n=$(node $i); l=$(cpus $i)
     say "== $i  driver $(driver $i)  node $n$([ $n = -1 ] && echo ' (unknown: using all CPUs)')  $(echo "$l" | wc -l) cpus ($(echo "$l" | head -1)..$(echo "$l" | tail -1))"
@@ -100,11 +133,12 @@ show() {
     q=$(irqs $i); [ -z "$q" ] && warn "no queue IRQs found for $i: affinity will be skipped"
     echo -n "   irq cpus:"; for x in $q; do echo -n " $(cat $PROC/irq/$x/smp_affinity_list 2>/dev/null)"; done; echo
     say "   plan: ${QN[$i]} queues, IRQs on cpus $(pick $i | tr '\n' ' ')"
+    c=$(chans $i Current); [[ $c =~ ^[0-9]+$ ]] && [ ${QN[$i]} -lt $c ] && warn "$i: apply LOWERS queues from $c to ${QN[$i]}"
+    [ ${QN[$i]} -gt ${AL[$i]} ] && warn "$i: ${QN[$i]} queues share ${AL[$i]} cpus"
   done
   say "irqbalance $(systemctl is-active irqbalance 2>/dev/null || echo none)   persisted: $([ -f $UNIT ] && echo yes || echo no)   rss: $([ -f $ST/rss ] && echo on || echo off)"
-  f=""; for i in $NICS; do f="$f $(cpus $i | tail -n +$(( ${USED[$(node $i)]} + 1 )))"; done
-  set -- $(echo $f | tr ' ' '\n' | sort -nu | head -3)
-  [ $# -eq 3 ] && say "free cpus for n2disk (by hand in $N2CONF): -c=$1 -w=$2 -z=$3"
+  set -- $(reserved $(set -- $NICS; echo $1) | head -3)
+  [ $# -eq 3 ] && say "cores kept free for n2disk (by hand in $N2CONF): -c=$1 -w=$2 -z=$3"
 }
 
 measure() {
@@ -153,7 +187,7 @@ revert() {
     [ -f $ST/rss ] && [ -n "$UDP" ] && ethtool -N $i rx-flow-hash udp4 $UDP 2>/dev/null
     say "$i: back to rx $RX, queues $COMB, gro $GRO, lro $LRO"
   done
-  rm -f $ST/rss
+  rm -f $ST/rss $ST/*.q
   [ "$(cat $ST/irqbalance.before 2>/dev/null)" = enabled ] && systemctl enable --now irqbalance >/dev/null 2>&1 && say "irqbalance on again"
   [ -f $UNIT ] && { systemctl disable nic-tune >/dev/null 2>&1; rm -f $UNIT; systemctl daemon-reload; say "boot unit removed"; }
 }
@@ -161,7 +195,7 @@ revert() {
 persist() {
   cp "$0" $SELF && chmod 755 $SELF
   printf '%s\n' "[Unit]" "Description=Capture NIC RX tuning" "After=network.target" "Before=n2disk.service" \
-    "[Service]" "Type=oneshot" "RemainAfterExit=yes" "Environment=\"NICS=$NICS\" Q=$QWANT ST=$ST" "ExecStart=$SELF boot" \
+    "[Service]" "Type=oneshot" "RemainAfterExit=yes" "Environment=\"NICS=$NICS\" ST=$ST MODE=boot${QSET:+ Q=$QSET}" "ExecStart=$SELF boot" \
     "[Install]" "WantedBy=multi-user.target" > $UNIT
   systemctl daemon-reload; systemctl enable nic-tune >/dev/null 2>&1 && say "persisted: runs at boot before n2disk ($UNIT)"
 }
@@ -176,13 +210,14 @@ run() {
     rss)     touch $ST/rss; for i in $NICS; do ethtool -N $i rx-flow-hash udp4 sdfn 2>/dev/null && say "$i: UDP hashed on ports too" || warn "$i: not supported"; done; sleep 3; show ;;
     persist) persist ;;
     revert)  revert; show ;;
-    *) sed -n '2,5p' "$0"; return 1 ;;
+    *) sed -n '2,6p' "$0"; return 1 ;;
   esac
 }
 
 # ---------- main ----------
 [ $(id -u) -eq 0 ] || [ -n "${NOROOT:-}" ] || { echo "run as root (sudo su -)"; exit 1; }
 have ethtool || warn "ethtool not installed: ring/queue changes and some counters unavailable"
+[ "${1:-}" = boot ] && MODE=boot
 choose; plan
 if [ $# -gt 0 ]; then run $1; exit; fi
 while :; do
@@ -203,7 +238,7 @@ while :; do
     5) yes "Run at every boot?" && run persist ;;
     6) yes "Back to the original settings?" && run revert ;;
     7) run status ;;
-    8) rm -f $ST/nics; NICS=""; choose; OFF=(); QN=(); USED=(); CNT=(); plan ;;
+    8) rm -f $ST/nics; NICS=""; choose; SLOT=(); QN=(); AL=(); CNT=(); FREE=(); RSV=(); RES=(); NP=(); SIBOF=(); plan ;;
     0|q) exit 0 ;;
   esac
 done
